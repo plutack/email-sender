@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GetLogs, SubscribeToLogs } from "../../wailsjs/go/main/App";
+import { GetLogs } from "../../wailsjs/go/main/App";
+// import { Events } from "@wailsapp/runtime"; // Import the Events from Wails
+import {EventsOn, EventsOff} from "../../wailsjs/runtime/runtime";
 
 interface LogEntry {
   timestamp: string;
@@ -16,14 +18,16 @@ const Logger: React.FC = () => {
     // Initial load of logs
     GetLogs().then(setLogs);
 
-    // Subscribe to new logs
-    SubscribeToLogs((newLog: LogEntry) => {
+    // Subscribe to new logs using Wails Events
+    const handleNewLog = (newLog: LogEntry) => {
       setLogs((prevLogs) => [...prevLogs, newLog]);
-    });
+    };
 
-    // Cleanup function
+    EventsOn("newLog", handleNewLog);
+
+    // Cleanup function to unsubscribe from events
     return () => {
-      // If there's a way to unsubscribe, call it here
+      EventsOff("newLog"); // Unsubscribe from newLog events
     };
   }, []);
 

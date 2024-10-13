@@ -12,20 +12,37 @@ import { SendMail } from "../wailsjs/go/main/App";
 interface EmailData {
   sender: string;
   password: string;
+  subject: string;
   message: string;
 }
+
+type Recipient = {
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+// Function to map CSVRow to Recipient
+const mapCSVDataToRecipientsType = (csvRows: CSVData[]): Recipient[] => {
+  return csvRows.map((row) => ({
+    firstName: row.firstName,
+    lastName: row.lastName,
+    email: row.email,
+  }));
+};
 
 function App() {
   const [emailData, setEmailData] = useState<EmailData>({
     sender: "",
     password: "",
+    subject: "",
     message: "",
   });
   const [csvData, setCSVData] = useState<CSVData[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleInputChange = (
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { id, value } = event.target;
     setEmailData((prev) => ({ ...prev, [id]: value }));
@@ -115,6 +132,15 @@ function App() {
             />
           </div>
           <div className="flex flex-col gap-4 h-full">
+            <div>
+              <Label htmlFor="subject">Subject</Label>
+              <Input
+                id="subject"
+                placeholder="Enter your subject"
+                value={emailData.subject}
+                onChange={handleInputChange}
+              />
+            </div>
             <Textarea
               id="message"
               className="h-full"
