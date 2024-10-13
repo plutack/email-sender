@@ -64,9 +64,7 @@ function App() {
 
   const handleSendEmail = async () => {
     try {
-      const recipients = csvData
-        .map((row) => row.email)
-        .filter((email) => email);
+      const recipients = csvData;
 
       if (recipients.length === 0) {
         toast({
@@ -76,13 +74,17 @@ function App() {
         });
         return;
       }
-
-      SendMail(
+      toast({
+        title: "Sending email...",
+        description: "Please wait while the email is being sent.",
+      });
+      console.log(recipients);
+      await SendMail(
         emailData.sender,
         emailData.password,
-        recipients,
+        emailData.subject,
         emailData.message,
-        JSON.stringify(csvData)
+        mapCSVDataToRecipientsType(recipients),
       );
 
       toast({

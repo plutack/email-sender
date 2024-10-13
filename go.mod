@@ -4,7 +4,10 @@ go 1.21
 
 toolchain go1.23.2
 
-require github.com/wailsapp/wails/v2 v2.9.2
+require (
+	github.com/wailsapp/wails/v2 v2.9.2
+	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
+)
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect
@@ -34,6 +37,7 @@ require (
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
+	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 )
 
 // replace github.com/wailsapp/wails/v2 v2.9.2 => /home/plutack/projects/go
