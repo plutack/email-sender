@@ -7,5 +7,3 @@ export function AddLog(arg1:string,arg2:main.LogType):Promise<void>;
 export function GetLogs():Promise<Array<main.LogEntry>>;
 
 export function SendMail(arg1:string,arg2:string,arg3:string,arg4:string,arg5:Array<main.recipient>):Promise<void>;
-
-export function SubscribeToLogs(arg1:any):Promise<void>;

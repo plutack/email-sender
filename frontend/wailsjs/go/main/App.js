@@ -13,7 +13,3 @@ export function GetLogs() {
 export function SendMail(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['SendMail'](arg1, arg2, arg3, arg4, arg5);
 }
-
-export function SubscribeToLogs(arg1) {
-  return window['go']['main']['App']['SubscribeToLogs'](arg1);
-}

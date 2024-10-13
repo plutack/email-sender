@@ -145,32 +145,6 @@ func (a *App) GetLogs() []LogEntry {
 	return a.logs
 }
 
-// SubscribeToLogs sets up a subscription for new logs
-func (a *App) SubscribeToLogs(callback func(LogEntry)) {
-	subID := time.Now().String() // Use a timestamp as a simple unique ID
-	ch := make(chan LogEntry, 100)
-
-	a.subMutex.Lock()
-	a.subscriptions[subID] = ch
-	a.subMutex.Unlock()
-
-	// Start a goroutine to handle this subscription
-	go func() {
-		for log := range ch {
-			callback(log)
-		}
-	}()
-
-	// Start another goroutine to clean up the subscription when the frontend disconnects
-	go func() {
-		<-a.ctx.Done()
-		a.subMutex.Lock()
-		delete(a.subscriptions, subID)
-		close(ch)
-		a.subMutex.Unlock()
-	}()
-}
-
 // AddLog adds a new log entry and notifies all subscribers
 func (a *App) AddLog(message string, logType LogType) {
 	newLog := LogEntry{
