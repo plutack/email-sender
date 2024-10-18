@@ -1,4 +1,4 @@
-import React, { useState, useRef, ChangeEvent } from "react";
+import React, { ChangeEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,40 +9,50 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { X, Upload, PlusCircle, Trash2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { PlusCircle, Trash2, Upload, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import * as XLSX from "xlsx-js-style";
 
-export interface CSVRow {
+export interface DataRow {
   id: string;
-  firstName: string;
-  lastName: string;
+  surname: string;
+  otherNames: string;
   email: string;
 }
 
-interface CSVViewerProps {
-  onUpdate: (newCSVData: CSVRow[]) => void;
+interface DataViewerProps {
+  onUpdate: (newData: DataRow[]) => void;
 }
 
-const CSVViewer: React.FC<CSVViewerProps> = ({ onUpdate }) => {
-  const [csvData, setCsvData] = useState<CSVRow[]>([
-    { id: "1", firstName: "", lastName: "", email: "" },
+const DataViewer: React.FC<DataViewerProps> = ({ onUpdate }) => {
+  const [data, setData] = useState<DataRow[]>([
+    { id: "1", surname: "", otherNames: "", email: "" },
   ]);
   const [isImported, setIsImported] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const expectedHeaders = ["firstName", "lastName", "email"];
+  const requiredFields = ["Surname", "Other Names", "E-mail address"];
+
+  const formatName = (name: string): string => {
+    return name.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  const formatSurname = (surname: string): string => {
+    return surname.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  };
 
   const handleFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.type !== "text/csv") {
+      const fileExt = file.name.split(".").pop()?.toLowerCase();
+      if (fileExt !== "csv" && fileExt !== "xlsx") {
         toast({
           title: "Invalid file type",
-          description: "Please upload a CSV file.",
+          description: "Please upload a CSV or XLSX file.",
           variant: "destructive",
         });
         return;
@@ -50,96 +60,157 @@ const CSVViewer: React.FC<CSVViewerProps> = ({ onUpdate }) => {
 
       const reader = new FileReader();
       reader.onload = (e: ProgressEvent<FileReader>) => {
-        const text = e.target?.result as string;
-        const rows = text.split("\n").map((row) => row.split(","));
-
-        // Extract the first row as potential headers
-        const headers = rows[0].map((header) => header.trim());
-
-        // Check if headers match the expected headers
-        const isValidHeader = expectedHeaders.every(
-          (expected, index) =>
-            headers[index] &&
-            headers[index].toLowerCase() === expected.toLowerCase()
-        );
-
-        if (!isValidHeader) {
+        try {
+          let parsedData: DataRow[];
+          if (fileExt === "csv") {
+            parsedData = parseCSV(e.target?.result as string);
+          } else {
+            parsedData = parseXLSX(e.target?.result as ArrayBuffer);
+          }
+          setData(parsedData);
+          setFileName(file.name);
+          setIsImported(true);
+          onUpdate(parsedData);
+        } catch (error) {
           toast({
-            title: "Invalid Headers",
-            description: "CSV headers do not match the expected format.",
+            title: "Error parsing file",
+            description: (error as Error).message,
             variant: "destructive",
           });
-          return;
         }
-
-        // Remove the first row (header) and filter empty rows
-        const filteredRows = rows.slice(1).filter(
-          (row) => row[0] && row[1] && row[2] // Ensure firstName, lastName, and email exist
-        );
-
-        const parsedData = filteredRows.map((row, index) => ({
-          id: (index + 1).toString(),
-          firstName: row[0].trim(),
-          lastName: row[1].trim(),
-          email: row[2].trim(),
-        }));
-
-        setCsvData(parsedData);
-        setFileName(file.name);
-        setIsImported(true);
-        onUpdate(parsedData); // Pass filtered data to parent
       };
-      reader.readAsText(file);
+
+      if (fileExt === "csv") {
+        reader.readAsText(file);
+      } else {
+        reader.readAsArrayBuffer(file);
+      }
     }
   };
 
-  const handleRemoveCSV = () => {
-    setCsvData([{ id: "1", firstName: "", lastName: "", email: "" }]);
+  const parseCSV = (content: string): DataRow[] => {
+    const rows = content.split("\n").map((row) => row.split(","));
+    const headers = rows[0].map((header) => header.trim());
+
+    const fieldIndices = getFieldIndices(headers);
+
+    return rows
+      .slice(1)
+      .filter((row) => row.some((cell) => cell.trim() !== ""))
+      .map((row, index) => ({
+        id: (index + 1).toString(),
+        surname: formatSurname(row[fieldIndices.surname]?.trim() || ""),
+        otherNames: formatName(row[fieldIndices.otherNames]?.trim() || ""),
+        email: row[fieldIndices.email]?.trim() || "",
+      }));
+  };
+
+  const parseXLSX = (content: ArrayBuffer): DataRow[] => {
+    const workbook = XLSX.read(content, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+    }) as string[][];
+
+    const headers = jsonData[0].map((header) => header.trim());
+    const fieldIndices = getFieldIndices(headers);
+
+    return jsonData
+      .slice(1)
+      .filter((row) => row.some((cell) => cell !== ""))
+      .map((row, index) => ({
+        id: (index + 1).toString(),
+        surname: formatSurname(row[fieldIndices.surname] || ""),
+        otherNames: formatName(row[fieldIndices.otherNames] || ""),
+        email: row[fieldIndices.email] || "",
+      }));
+  };
+
+  const getFieldIndices = (headers: string[]) => {
+    const indices = {
+      surname: headers.findIndex((h) => h.toLowerCase() === "surname"),
+      otherNames: headers.findIndex((h) => h.toLowerCase() === "other names"),
+      email: headers.findIndex((h) => h.toLowerCase() === "e-mail address"),
+    };
+
+    if (
+      indices.surname === -1 ||
+      indices.otherNames === -1 ||
+      indices.email === -1
+    ) {
+      throw new Error(
+        `Missing required fields. Please ensure your file includes: ${
+          requiredFields.join(
+            ", ",
+          )
+        }`,
+      );
+    }
+
+    return indices;
+  };
+
+  const handleRemoveFile = () => {
+    setData([{ id: "1", surname: "", otherNames: "", email: "" }]);
     setFileName(null);
     setIsImported(false);
-    onUpdate([]); // Clear data in parent
+    onUpdate([]);
 
-    // Clear the file input value
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // Reset input value so the same file can be re-added
+      fileInputRef.current.value = "";
     }
     toast({
-      title: "CSV removed",
-      description: "The CSV file has been removed.",
+      title: "File removed",
+      description: "The imported file has been removed.",
       variant: "success",
     });
   };
 
   const handleInputChange = (
     id: string,
-    field: keyof CSVRow,
-    value: string
+    field: keyof DataRow,
+    value: string,
   ) => {
-    const updatedData = csvData.map((row) =>
-      row.id === id ? { ...row, [field]: value } : row
-    );
-    setCsvData(updatedData);
-    onUpdate(updatedData); // Send updated data to parent
+    const updatedData = data.map((row) => {
+      if (row.id === id) {
+        let formattedValue = value;
+        if (field === "surname") {
+          formattedValue = formatSurname(value);
+        } else if (field === "otherNames") {
+          formattedValue = formatName(value);
+        }
+        return { ...row, [field]: formattedValue };
+      }
+      return row;
+    });
+    setData(updatedData);
+    onUpdate(updatedData);
   };
 
   const handleAddRow = () => {
-    const newId = (parseInt(csvData[csvData.length - 1].id) + 1).toString();
-    const newRow = { id: newId, firstName: "", lastName: "", email: "" };
-    setCsvData([...csvData, newRow]);
-    onUpdate([...csvData, newRow]); // Update parent with new row
+    const newId = (parseInt(data[data.length - 1].id) + 1).toString();
+    const newRow: DataRow = {
+      id: newId,
+      surname: "",
+      otherNames: "",
+      email: "",
+    };
+    setData([...data, newRow]);
+    onUpdate([...data, newRow]);
   };
 
   const handleRemoveRow = (id: string) => {
-    const updatedData = csvData.filter((row) => row.id !== id);
-    setCsvData(updatedData);
-    onUpdate(updatedData); // Update parent
+    const updatedData = data.filter((row) => row.id !== id);
+    setData(updatedData);
+    onUpdate(updatedData);
   };
 
   const handleClearAll = () => {
-    setCsvData([{ id: "1", firstName: "", lastName: "", email: "" }]);
+    setData([{ id: "1", surname: "", otherNames: "", email: "" }]);
     setIsImported(false);
     setFileName(null);
-    onUpdate([]); // Clear data in parent
+    onUpdate([]);
   };
 
   return (
@@ -147,14 +218,14 @@ const CSVViewer: React.FC<CSVViewerProps> = ({ onUpdate }) => {
       <div className="mb-4 flex justify-between items-center">
         <Input
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx"
           onChange={handleFileUpload}
           ref={fileInputRef}
           className="hidden"
         />
         <Button onClick={() => fileInputRef.current?.click()}>
           <Upload className="mr-2 h-4 w-4" />
-          Import CSV
+          Import CSV/XLSX
         </Button>
 
         {fileName && <span className="ml-4">Loaded: {fileName}</span>}
@@ -165,9 +236,9 @@ const CSVViewer: React.FC<CSVViewerProps> = ({ onUpdate }) => {
         </Button>
 
         {isImported && (
-          <Button variant="destructive" onClick={handleRemoveCSV}>
+          <Button variant="destructive" onClick={handleRemoveFile}>
             <Trash2 className="mr-2 h-4 w-4" />
-            Remove CSV
+            Remove File
           </Button>
         )}
       </div>
@@ -176,9 +247,10 @@ const CSVViewer: React.FC<CSVViewerProps> = ({ onUpdate }) => {
         <Table>
           <TableHeader className="sticky top-0 bg-white z-10">
             <TableRow>
-              <TableHead className="w-[200px]">First Name</TableHead>
-              <TableHead className="w-[200px]">Last Name</TableHead>
-              <TableHead className="w-[300px]">Email</TableHead>
+              <TableHead className="w-[50px]">#</TableHead>
+              <TableHead className="w-[200px]">Surname</TableHead>
+              <TableHead className="w-[200px]">Other Names</TableHead>
+              <TableHead className="w-[300px]">Email Address</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -187,35 +259,37 @@ const CSVViewer: React.FC<CSVViewerProps> = ({ onUpdate }) => {
           <Table>
             <TableBody>
               <AnimatePresence>
-                {csvData.map((row) => (
+                {data.map((row, index) => (
                   <motion.tr
                     key={row.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                   >
+                    <TableCell className="w-[50px]">{index + 1}</TableCell>
                     <TableCell className="w-[200px]">
                       <Input
-                        value={row.firstName}
+                        value={row.surname}
                         onChange={(e) =>
-                          handleInputChange(row.id, "firstName", e.target.value)
-                        }
+                          handleInputChange(row.id, "surname", e.target.value)}
                       />
                     </TableCell>
                     <TableCell className="w-[200px]">
                       <Input
-                        value={row.lastName}
+                        value={row.otherNames}
                         onChange={(e) =>
-                          handleInputChange(row.id, "lastName", e.target.value)
-                        }
+                          handleInputChange(
+                            row.id,
+                            "otherNames",
+                            e.target.value,
+                          )}
                       />
                     </TableCell>
                     <TableCell className="w-[300px]">
                       <Input
                         value={row.email}
                         onChange={(e) =>
-                          handleInputChange(row.id, "email", e.target.value)
-                        }
+                          handleInputChange(row.id, "email", e.target.value)}
                       />
                     </TableCell>
                     <TableCell className="w-[100px]">
@@ -245,4 +319,4 @@ const CSVViewer: React.FC<CSVViewerProps> = ({ onUpdate }) => {
   );
 };
 
-export default CSVViewer;
+export default DataViewer;

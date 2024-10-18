@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import CSVViewer from "@/components/csv-viewer";
 import Logger from "@/components/logger";
 import { toast } from "@/hooks/use-toast";
-import { CSVRow as CSVData } from "./components/csv-viewer";
+import { DataRow as CSVData } from "./components/csv-viewer";
 import { SendMail } from "../wailsjs/go/main/App";
 
 interface EmailData {
@@ -17,16 +17,16 @@ interface EmailData {
 }
 
 type Recipient = {
-  firstName: string;
-  lastName: string;
+  surname: string;
+  otherNames: string;
   email: string;
 };
 
 // Function to map CSVRow to Recipient
 const mapCSVDataToRecipientsType = (csvRows: CSVData[]): Recipient[] => {
   return csvRows.map((row) => ({
-    firstName: row.firstName,
-    lastName: row.lastName,
+    surname: row.surname,
+    otherNames: row.otherNames,
     email: row.email,
   }));
 };

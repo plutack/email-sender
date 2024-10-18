@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 )
 
 type LogType string
+
+var emailRegexp *regexp.Regexp
 
 // add a new log type for neutral log messages and set info to success
 const (
@@ -38,12 +41,10 @@ type App struct {
 }
 
 type recipient struct {
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	Email     string `json:"email"`
+	Surname    string `json:"surname"`
+	OtherNames string `json:"otherNames"`
+	Email      string `json:"email"`
 }
-
-var emailRegExp *regexp.Regexp
 
 // NewApp creates a new App application struct
 func NewApp() *App {
@@ -87,13 +88,17 @@ func (a *App) SendMail(sender string, password string, subject string, messageBo
 
 	// check if any row has both first name and last name empty
 	for idx, r := range csvData {
-		if r.FirstName == "" && r.LastName == "" {
+		if r.Surname == "" && r.OtherNames == "" {
 			isBadCsv = true
-			a.AddLog(fmt.Sprintf("Entry at index: %d is invalid: No names object %v", idx, r), LogTypeError)
+			a.AddLog(fmt.Sprintf("Entry at index: %d is invalid: No names object %v", idx+1, r), LogTypeError)
 		}
-		if !emailRegExp.MatchString(r.Email) {
+	}
+
+	// check if all emails are valid
+	for idx, r := range csvData {
+		if !emailRegexp.MatchString(r.Email) {
 			isBadCsv = true
-			a.AddLog(fmt.Sprintf("Entry at index: %d is invalid: Invalid email", idx), LogTypeError)
+			a.AddLog(fmt.Sprintf("Entry at index: %d is invalid: Email is invalid %v", idx+1, r), LogTypeError)
 		}
 	}
 	if isBadCsv {
@@ -103,25 +108,19 @@ func (a *App) SendMail(sender string, password string, subject string, messageBo
 
 	d := gomail.NewDialer("smtp.gmail.com", 465, sender, password)
 
-	// Loop through each recipient and send a personalized email
+	// Loop through each recipient and send email
 	for idx, r := range csvData {
 		// Create a new message for each recipient
 		m := gomail.NewMessage()
 		m.SetHeader("From", sender)
 		m.SetHeader("To", r.Email)
 
-		// Personalize the email body using the EmailBody object
-		bodyContent := "Dear " + r.FirstName + " " + r.LastName + ",<br><br>" + messageBody
+		// replace escape sequence (new line) to html tag and  add name to EmailBody object
+		messageBody = strings.ReplaceAll(messageBody, "\n", "<br>")
+		bodyContent := "Dear " + r.Surname + " " + r.OtherNames + ",<br><br>" + messageBody
 		m.SetHeader("Subject", subject)
 		// add signature to the end
 		m.SetBody("text/html", bodyContent)
-
-		// Test if there is internet connection
-		// if !checkConnection() {
-		// 	a.AddLog("No internet connection", LogTypeError)
-		// 	return errors.New("error: check logs")
-		// }
-		// a.AddLog("Network check completed successfully", LogTypeInfo)
 
 		// Send the email
 		if err := d.DialAndSend(m); err != nil {
@@ -172,8 +171,6 @@ func (a *App) AddLog(message string, logType LogType) {
 	runtime.EventsEmit(a.ctx, "newLog", newLog)
 }
 
-
 func init() {
-	// create a regex to validate email addresses
-	emailRegExp = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	emailRegexp = regexp.MustCompile(`^([a-z0-9_\.-]+)@([\da-z\.-]+)\.([a-z\.]{2,6})$`)
 }

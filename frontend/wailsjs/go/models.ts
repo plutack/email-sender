@@ -17,8 +17,8 @@ export namespace main {
 	    }
 	}
 	export class recipient {
-	    firstName: string;
-	    lastName: string;
+	    surname: string;
+	    otherNames: string;
 	    email: string;
 	
 	    static createFrom(source: any = {}) {
@@ -27,8 +27,8 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.firstName = source["firstName"];
-	        this.lastName = source["lastName"];
+	        this.surname = source["surname"];
+	        this.otherNames = source["otherNames"];
 	        this.email = source["email"];
 	    }
 	}
