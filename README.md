@@ -1,8 +1,8 @@
-## About
+# About
 
 This is a simple desktop application built with Wails and Tailwind CSS and Shadcn UI
 
-## Image showing interface and functionality
+# Image showing interface and functionality
 ![user interface](public/email-sender.png)
 
 ## Features
