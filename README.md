@@ -1,5 +1,3 @@
-# README
-
 ## About
 
 This is a simple desktop application built with Wails and Tailwind CSS and Shadcn UI
